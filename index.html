@@ -610,45 +610,35 @@
     // ============================================
     // STATE MANAGEMENT
     // ============================================
-    const STATE = {
-      appData: {
-        clients: [],
-        services: [],
-        appointments: []
-      },
-      ui: {
-        currentPage: 'dashboard',
-        selectedDate: new Date(),
-        currentMonth: new Date(),
-        deleteCallback: null
-      },
-      charts: {
-        weekly: null,
-        monthlyRevenue: null,
-        services: null
-      },
-      config: {
-        shop_name: 'BarberPro',
-        welcome_message: 'Bem-vindo de volta!'
-      }
+    let appData = {
+      clients: [],
+      services: [],
+      appointments: []
     };
     
-    // Destructure STATE for easier access
-    const { appData, ui, charts, config } = STATE;
+    let currentPage = 'dashboard';
+    let selectedDate = new Date();
+    let currentMonth = new Date();
+    let deleteCallback = null;
+    let weeklyChart = null;
+    let monthlyRevenueChart = null;
+    let servicesChart = null;
     
     const defaultConfig = {
       shop_name: 'BarberPro',
       welcome_message: 'Bem-vindo de volta!'
     };
+    
+    let config = { ...defaultConfig };
 
     // ============================================
     // SDK INITIALIZATION
     // ============================================
     const dataHandler = {
       onDataChanged(data) {
-        STATE.appData.clients = data.filter(d => d.type === 'client');
-        STATE.appData.services = data.filter(d => d.type === 'service');
-        STATE.appData.appointments = data.filter(d => d.type === 'appointment');
+        appData.clients = data.filter(d => d.type === 'client');
+        appData.services = data.filter(d => d.type === 'service');
+        appData.appointments = data.filter(d => d.type === 'appointment');
         
         updateDashboard();
         renderClients();
@@ -664,7 +654,7 @@
         window.elementSdk.init({
           defaultConfig,
           onConfigChange: async (newConfig) => {
-            STATE.config = { ...defaultConfig, ...newConfig };
+            config = { ...defaultConfig, ...newConfig };
             applyConfig();
           },
           mapToCapabilities: (cfg) => ({
@@ -678,7 +668,7 @@
             ['welcome_message', cfg.welcome_message || defaultConfig.welcome_message]
           ])
         });
-        STATE.config = { ...defaultConfig, ...window.elementSdk.config };
+        config = { ...defaultConfig, ...window.elementSdk.config };
       }
       
       if (window.dataSdk) {
@@ -694,8 +684,8 @@
     }
 
     function applyConfig() {
-      const shopName = STATE.config.shop_name || defaultConfig.shop_name;
-      const welcomeMsg = STATE.config.welcome_message || defaultConfig.welcome_message;
+      const shopName = config.shop_name || defaultConfig.shop_name;
+      const welcomeMsg = config.welcome_message || defaultConfig.welcome_message;
       
       document.getElementById('loginShopName').textContent = shopName;
       document.getElementById('sidebarShopName').textContent = shopName;
@@ -728,7 +718,7 @@
     // NAVIGATION
     // ============================================
     function navigateTo(page) {
-      STATE.ui.currentPage = page;
+      currentPage = page;
       
       document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
       document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
@@ -776,20 +766,20 @@
     // ============================================
     function updateDashboard() {
       const today = new Date().toISOString().split('T')[0];
-      const todayAppts = STATE.appData.appointments.filter(a => a.appointment_date === today);
+      const todayAppts = appData.appointments.filter(a => a.appointment_date === today);
       const completedToday = todayAppts.filter(a => a.appointment_status === 'completed');
       
       document.getElementById('todayAppointments').textContent = todayAppts.length;
-      document.getElementById('totalClients').textContent = STATE.appData.clients.length;
+      document.getElementById('totalClients').textContent = appData.clients.length;
       
       let todayRevenue = 0;
       completedToday.forEach(appt => {
-        const service = STATE.appData.services.find(s => s.service_name === appt.appointment_service);
+        const service = appData.services.find(s => s.service_name === appt.appointment_service);
         if (service) todayRevenue += service.service_price;
       });
       document.getElementById('todayRevenue').textContent = `R$ ${todayRevenue.toFixed(2)}`;
       
-      const upcomingAppts = STATE.appData.appointments
+      const upcomingAppts = appData.appointments
         .filter(a => a.appointment_status === 'scheduled' && a.appointment_date >= today)
         .sort((a, b) => {
           if (a.appointment_date !== b.appointment_date) {
@@ -844,7 +834,7 @@
       const container = document.getElementById('topServices');
       const serviceCount = {};
       
-      STATE.appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
+      appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
         serviceCount[appt.appointment_service] = (serviceCount[appt.appointment_service] || 0) + 1;
       });
       
@@ -858,7 +848,7 @@
       }
       
       container.innerHTML = sortedServices.map(([name, count], index) => {
-        const service = STATE.appData.services.find(s => s.service_name === name);
+        const service = appData.services.find(s => s.service_name === name);
         const colors = ['from-brand-400 to-brand-600', 'from-blue-400 to-blue-600', 'from-purple-400 to-purple-600', 'from-green-400 to-green-600'];
         
         return `
@@ -884,7 +874,7 @@
     function initCharts() {
       const weeklyCtx = document.getElementById('weeklyChart');
       if (weeklyCtx) {
-        STATE.charts.weekly = new Chart(weeklyCtx, {
+        weeklyChart = new Chart(weeklyCtx, {
           type: 'bar',
           data: {
             labels: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
@@ -919,7 +909,7 @@
     }
 
     function updateWeeklyChart() {
-      if (!STATE.charts.weekly) return;
+      if (!weeklyChart) return;
       
       const today = new Date();
       const weekData = [0, 0, 0, 0, 0, 0, 0];
@@ -929,33 +919,33 @@
         date.setDate(today.getDate() - today.getDay() + i);
         const dateStr = date.toISOString().split('T')[0];
         
-        STATE.appData.appointments
+        appData.appointments
           .filter(a => a.appointment_date === dateStr && a.appointment_status === 'completed')
           .forEach(appt => {
-            const service = STATE.appData.services.find(s => s.service_name === appt.appointment_service);
+            const service = appData.services.find(s => s.service_name === appt.appointment_service);
             if (service) weekData[i] += service.service_price;
           });
       }
       
-      STATE.charts.weekly.data.datasets[0].data = weekData;
-      STATE.charts.weekly.update();
+      weeklyChart.data.datasets[0].data = weekData;
+      weeklyChart.update();
     }
 
     function updateReportCharts() {
       const monthlyCtx = document.getElementById('monthlyRevenueChart');
       const servicesCtx = document.getElementById('servicesChart');
       
-      if (monthlyCtx && !STATE.charts.monthlyRevenue) {
+      if (monthlyCtx && !monthlyRevenueChart) {
         const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const monthData = new Array(12).fill(0);
         
-        STATE.appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
+        appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
           const month = new Date(appt.appointment_date).getMonth();
-          const service = STATE.appData.services.find(s => s.service_name === appt.appointment_service);
+          const service = appData.services.find(s => s.service_name === appt.appointment_service);
           if (service) monthData[month] += service.service_price;
         });
         
-        STATE.charts.monthlyRevenue = new Chart(monthlyCtx, {
+        monthlyRevenueChart = new Chart(monthlyCtx, {
           type: 'line',
           data: {
             labels: monthLabels,
@@ -987,15 +977,15 @@
         });
       }
       
-      if (servicesCtx && !STATE.charts.services) {
+      if (servicesCtx && !servicesChart) {
         const serviceCount = {};
-        STATE.appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
+        appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
           serviceCount[appt.appointment_service] = (serviceCount[appt.appointment_service] || 0) + 1;
         });
         
         const sortedServices = Object.entries(serviceCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
         
-        STATE.charts.services = new Chart(servicesCtx, {
+        servicesChart = new Chart(servicesCtx, {
           type: 'doughnut',
           data: {
             labels: sortedServices.map(s => s[0]) || ['Nenhum serviço'],
@@ -1032,9 +1022,9 @@
       let servicesCount = 0;
       const clientsServed = new Set();
       
-      STATE.appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
+      appData.appointments.filter(a => a.appointment_status === 'completed').forEach(appt => {
         const apptDate = new Date(appt.appointment_date);
-        const service = STATE.appData.services.find(s => s.service_name === appt.appointment_service);
+        const service = appData.services.find(s => s.service_name === appt.appointment_service);
         
         if (appt.appointment_date === todayStr && service) {
           dailyRevenue += service.service_price;
@@ -1063,8 +1053,8 @@
 
     function renderCalendar() {
       const grid = document.getElementById('calendarGrid');
-      const year = STATE.ui.currentMonth.getFullYear();
-      const month = STATE.ui.currentMonth.getMonth();
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
       
       const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
@@ -1083,8 +1073,8 @@
         const date = new Date(year, month, day);
         const dateStr = date.toISOString().split('T')[0];
         const isToday = date.toDateString() === today.toDateString();
-        const isSelected = date.toDateString() === STATE.ui.selectedDate.toDateString();
-        const hasAppointment = STATE.appData.appointments.some(a => a.appointment_date === dateStr);
+        const isSelected = date.toDateString() === selectedDate.toDateString();
+        const hasAppointment = appData.appointments.some(a => a.appointment_date === dateStr);
         
         html += `
           <button onclick="selectDate(${year}, ${month}, ${day})" 
@@ -1099,25 +1089,25 @@
     }
 
     function selectDate(year, month, day) {
-      STATE.ui.selectedDate = new Date(year, month, day);
+      selectedDate = new Date(year, month, day);
       renderCalendar();
       renderSchedule();
     }
 
     function changeMonth(delta) {
-      STATE.ui.currentMonth.setMonth(STATE.ui.currentMonth.getMonth() + delta);
+      currentMonth.setMonth(currentMonth.getMonth() + delta);
       renderCalendar();
     }
 
     function renderSchedule() {
       const container = document.getElementById('scheduleView');
-      const dateStr = STATE.ui.selectedDate.toISOString().split('T')[0];
+      const dateStr = selectedDate.toISOString().split('T')[0];
       
       const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-      document.getElementById('selectedDateTitle').textContent = dayNames[STATE.ui.selectedDate.getDay()];
+      document.getElementById('selectedDateTitle').textContent = dayNames[selectedDate.getDay()];
       document.getElementById('selectedDateSubtitle').textContent = formatDate(dateStr);
       
-      const dayAppointments = STATE.appData.appointments
+      const dayAppointments = appData.appointments
         .filter(a => a.appointment_date === dateStr)
         .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
       
@@ -1171,7 +1161,7 @@
     }
 
     function quickAppointment(time) {
-      document.getElementById('appointmentDate').value = STATE.ui.selectedDate.toISOString().split('T')[0];
+      document.getElementById('appointmentDate').value = selectedDate.toISOString().split('T')[0];
       document.getElementById('appointmentTime').value = time;
       openAppointmentModal();
     }
@@ -1183,7 +1173,7 @@
       const tbody = document.getElementById('clientsTableBody');
       const searchTerm = document.getElementById('clientSearch')?.value?.toLowerCase() || '';
       
-      const filteredClients = STATE.appData.clients.filter(c => 
+      const filteredClients = appData.clients.filter(c => 
         c.name.toLowerCase().includes(searchTerm) ||
         c.phone?.toLowerCase().includes(searchTerm) ||
         c.email?.toLowerCase().includes(searchTerm)
@@ -1195,7 +1185,7 @@
       }
       
       tbody.innerHTML = filteredClients.map(client => {
-        const appointments = STATE.appData.appointments.filter(a => a.appointment_client === client.name).length;
+        const appointments = appData.appointments.filter(a => a.appointment_client === client.name).length;
         
         return `
           <tr class="table-row border-b border-gray-800/50">
@@ -1252,15 +1242,15 @@
     }
 
     function editClient(id) {
-      const client = STATE.appData.clients.find(c => c.__backendId === id);
+      const client = appData.clients.find(c => c.__backendId === id);
       if (client) openClientModal(client);
     }
 
     function deleteClient(id) {
-      const client = STATE.appData.clients.find(c => c.__backendId === id);
+      const client = appData.clients.find(c => c.__backendId === id);
       if (client) {
         document.getElementById('deleteModalText').textContent = `Tem certeza que deseja excluir o cliente "${client.name}"?`;
-        STATE.ui.deleteCallback = async () => {
+        deleteCallback = async () => {
           const btn = document.getElementById('deleteConfirmBtn');
           btn.disabled = true;
           btn.textContent = 'Excluindo...';
@@ -1300,10 +1290,10 @@
       
       let result;
       if (clientId) {
-        const existingClient = STATE.appData.clients.find(c => c.__backendId === clientId);
+        const existingClient = appData.clients.find(c => c.__backendId === clientId);
         result = await window.dataSdk.update({ ...existingClient, ...clientData });
       } else {
-        if (STATE.appData.clients.length + STATE.appData.services.length + STATE.appData.appointments.length >= 999) {
+        if (appData.clients.length + appData.services.length + appData.appointments.length >= 999) {
           showToast('Limite de registros atingido (999)', 'error');
           btn.disabled = false;
           btn.textContent = 'Salvar';
@@ -1330,7 +1320,7 @@
       const grid = document.getElementById('servicesGrid');
       const searchTerm = document.getElementById('serviceSearch')?.value?.toLowerCase() || '';
       
-      const filteredServices = STATE.appData.services.filter(s =>
+      const filteredServices = appData.services.filter(s =>
         s.service_name.toLowerCase().includes(searchTerm) ||
         s.service_category?.toLowerCase().includes(searchTerm)
       );
@@ -1407,15 +1397,15 @@
     }
 
     function editService(id) {
-      const service = STATE.appData.services.find(s => s.__backendId === id);
+      const service = appData.services.find(s => s.__backendId === id);
       if (service) openServiceModal(service);
     }
 
     function deleteService(id) {
-      const service = STATE.appData.services.find(s => s.__backendId === id);
+      const service = appData.services.find(s => s.__backendId === id);
       if (service) {
         document.getElementById('deleteModalText').textContent = `Tem certeza que deseja excluir o serviço "${service.service_name}"?`;
-        STATE.ui.deleteCallback = async () => {
+        deleteCallback = async () => {
           const btn = document.getElementById('deleteConfirmBtn');
           btn.disabled = true;
           btn.textContent = 'Excluindo...';
@@ -1455,10 +1445,10 @@
       
       let result;
       if (serviceId) {
-        const existingService = STATE.appData.services.find(s => s.__backendId === serviceId);
+        const existingService = appData.services.find(s => s.__backendId === serviceId);
         result = await window.dataSdk.update({ ...existingService, ...serviceData });
       } else {
-        if (STATE.appData.clients.length + STATE.appData.services.length + STATE.appData.appointments.length >= 999) {
+        if (appData.clients.length + appData.services.length + appData.appointments.length >= 999) {
           showToast('Limite de registros atingido (999)', 'error');
           btn.disabled = false;
           btn.textContent = 'Salvar';
@@ -1486,10 +1476,10 @@
       const serviceSelect = document.getElementById('appointmentService');
       
       clientSelect.innerHTML = '<option value="">Selecione um cliente</option>' +
-        STATE.appData.clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+        appData.clients.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
       
       serviceSelect.innerHTML = '<option value="">Selecione um serviço</option>' +
-        STATE.appData.services.map(s => `<option value="${s.service_name}">${s.service_name} - R$ ${s.service_price.toFixed(2)}</option>`).join('');
+        appData.services.map(s => `<option value="${s.service_name}">${s.service_name} - R$ ${s.service_price.toFixed(2)}</option>`).join('');
     }
 
     function openAppointmentModal(appointment = null) {
@@ -1497,7 +1487,7 @@
       document.getElementById('appointmentForm').reset();
       document.getElementById('appointmentId').value = '';
       document.getElementById('appointmentModalTitle').textContent = 'Novo Agendamento';
-      document.getElementById('appointmentDate').value = STATE.ui.selectedDate.toISOString().split('T')[0];
+      document.getElementById('appointmentDate').value = selectedDate.toISOString().split('T')[0];
       
       if (appointment) {
         document.getElementById('appointmentId').value = appointment.__backendId;
@@ -1515,7 +1505,7 @@
     }
 
     function editAppointment(id) {
-      const appointment = STATE.appData.appointments.find(a => a.__backendId === id);
+      const appointment = appData.appointments.find(a => a.__backendId === id);
       if (appointment) openAppointmentModal(appointment);
     }
 
@@ -1539,10 +1529,10 @@
       
       let result;
       if (appointmentId) {
-        const existingAppointment = STATE.appData.appointments.find(a => a.__backendId === appointmentId);
+        const existingAppointment = appData.appointments.find(a => a.__backendId === appointmentId);
         result = await window.dataSdk.update({ ...existingAppointment, ...appointmentData });
       } else {
-        if (STATE.appData.clients.length + STATE.appData.services.length + STATE.appData.appointments.length >= 999) {
+        if (appData.clients.length + appData.services.length + appData.appointments.length >= 999) {
           showToast('Limite de registros atingido (999)', 'error');
           btn.disabled = false;
           btn.textContent = 'Salvar';
@@ -1567,11 +1557,11 @@
     // ============================================
     function closeDeleteModal() {
       document.getElementById('deleteModal').classList.add('hidden');
-      STATE.ui.deleteCallback = null;
+      deleteCallback = null;
     }
 
     function confirmDelete() {
-      if (STATE.ui.deleteCallback) STATE.ui.deleteCallback();
+      if (deleteCallback) deleteCallback();
     }
 
     // ============================================
@@ -1621,5 +1611,5 @@
     // Initialize app
     initApp();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d8c02687550f1c5',t:'MTc3MjkxMTc3MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d8bdb8d11e7f203',t:'MTc3MjkxMDE3OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
